@@ -18,3 +18,4 @@ pandasai.log
 # (optional) ignore local data & test notebook
 titanic.csv
 # test.ipynb
+requirements1.txt

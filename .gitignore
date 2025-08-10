@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual env
+prompt_analyst/
+
+# Streamlit local secrets (never commit)
+.streamlit/secrets.toml
+
+# Runtime artifacts
+cache/
+exports/
+pandasai.log
+
+# Jupyter
+.ipynb_checkpoints/
+# (optional) ignore local data & test notebook
+titanic.csv
+# test.ipynb

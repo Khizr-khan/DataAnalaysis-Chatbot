@@ -2,6 +2,28 @@ import os
 import requests
 from pandasai.llm.base import LLM
 
+def _resolve_groq_key(explicit_key=None):
+    # 1) explicit
+    if explicit_key and str(explicit_key).strip():
+        return str(explicit_key).strip()
+
+    # 2) Streamlit secrets (if available)
+    try:
+        import streamlit as st
+        if "GROQ_API_KEY" in st.secrets:
+            k = st.secrets["GROQ_API_KEY"]
+            if k and str(k).strip():
+                return str(k).strip()
+    except Exception:
+        pass
+
+    # 3) Environment variable
+    k = os.getenv("GROQ_API_KEY")
+    if k and str(k).strip():
+        return str(k).strip()
+
+    return None
+
 class GroqLLM(LLM):
     """
     Minimal PandasAI-compatible wrapper for Groq's Chat Completions API
@@ -10,11 +32,11 @@ class GroqLLM(LLM):
 
     def __init__(self, model="llama-3.1-8b-instant", api_key=None, base_url="https://api.groq.com/openai/v1"):
         self.model = model
-        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        self.api_key = _resolve_groq_key(api_key)
         self.base_url = base_url.rstrip("/")
         if not self.api_key:
             raise RuntimeError(
-                "GROQ_API_KEY is not set. Export it (or add to Streamlit secrets) or pass api_key=..."
+                "GROQ_API_KEY is not set. Add it in Streamlit Secrets or export it as an env var."
             )
         super().__init__()
 

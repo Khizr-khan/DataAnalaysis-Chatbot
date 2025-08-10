@@ -16,17 +16,13 @@ from PIL import Image
 st.set_page_config(page_title="AI CSV Analyst", layout="wide")
 st.title("🤖 Ask Anything About Your CSV (with Charts!)")
 
-# Read Groq key from Streamlit secrets OR env var
-groq_api_key = None
-try:
-    groq_api_key = st.secrets.get("GROQ_API_KEY")
-except Exception:
-    pass
-groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
-
 # Use Groq (OpenAI-compatible). Pick any Groq model you like:
 # "llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"
-llm = GroqLLM(model="llama-3.1-8b-instant", api_key=groq_api_key)
+try:
+    llm = GroqLLM(model="llama-3.1-8b-instant")  # key resolved inside GroqLLM
+except RuntimeError as e:
+    st.error(str(e))
+    st.stop()
 
 # If you want to switch back to local Ollama, comment the line above and uncomment:
 # llm = OllamaLLM(model="llama3", api_base="http://localhost:11434")

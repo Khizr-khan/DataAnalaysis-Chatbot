@@ -1,6 +1,6 @@
-streamlit
-pandas
-matplotlib
-pandasai
-requests
-pillow
+streamlit>=1.36
+pandas>=2.1
+matplotlib>=3.8
+pillow>=10.0
+requests>=2.31
+pandasai>=2.1.0

@@ -1,19 +1,19 @@
 # Core framework
-streamlit>=1.36,<2
+streamlit
 
 # Data handling
-pandas>=2.3
-numpy>=2.1,<3
+pandas
+numpy
 
 # Visualization & images
-matplotlib>=3.9
-pillow>=11.0
+matplotlib
+pillow
 
 # Networking
-requests>=2.31,<3
+requests
 
 # LLM integration for Pandas
-pandasai==2.2.15
+pandasai
 
 # YAML support
-PyYAML>=6.0
+PyYAML

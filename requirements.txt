@@ -13,7 +13,7 @@ pillow
 requests
 
 # LLM integration for Pandas
-pandasai
+pandasai>=2.3
 
 # YAML support
 PyYAML

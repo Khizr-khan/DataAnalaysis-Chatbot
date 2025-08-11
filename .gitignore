@@ -21,4 +21,4 @@ titanic.csv
 # requirements1.txt
 launch.py
 AskPrompt.spec
-.build/
+build/

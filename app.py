@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")  # important on Streamlit Cloud (no GUI)
 import matplotlib.pyplot as plt
-from pandasai import SmartDataframe
+import pandasai as pai  # updated for latest API
 # from ollama_llm import OllamaLLM   # ← keep if you want to switch back locally
 from groq_llm import GroqLLM        # ← use Groq
 
@@ -19,15 +19,11 @@ st.set_page_config(page_title="AI CSV Analyst", layout="wide")
 st.title("🤖 Ask Anything About Your CSV (with Charts!)")
 
 # Use Groq (OpenAI-compatible). Pick any Groq model you like:
-# "llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"
 try:
     llm = GroqLLM(model="llama-3.1-8b-instant")  # key resolved inside GroqLLM
 except RuntimeError as e:
     st.error(str(e))
     st.stop()
-
-# If you want to switch back to local Ollama, comment the line above and uncomment:
-# llm = OllamaLLM(model="llama3", api_base="http://localhost:11434")
 
 # -------------------- Session state --------------------
 if "chart_png" not in st.session_state:
@@ -54,13 +50,12 @@ if uploaded_file is not None:
             if prompt.strip():
                 with st.spinner("🧠 Thinking..."):
                     try:
-                        smart_df = SmartDataframe(
-                            df,
-                            config={
-                                "llm": llm,
-                                "enable_code_execution": True,  # allow plotting code
-                            },
-                        )
+                        # New PandasAI usage
+                        pai.config.set({
+                            "llm": llm,
+                            "enable_code_execution": True,  # allow plotting code
+                        })
+                        smart_df = pai.DataFrame(df)
 
                         # A) Clean matplotlib state each run
                         plt.close('all')
@@ -100,7 +95,6 @@ if uploaded_file is not None:
 
                         if fig and fig.get_axes():
                             buf = io.BytesIO()
-                            # render at decent DPI so zoom looks crisp
                             fig.set_dpi(150)
                             fig.savefig(buf, format="png", bbox_inches="tight", facecolor="white")
                             buf.seek(0)
@@ -122,7 +116,6 @@ if uploaded_file is not None:
 
         # -------------------- Zoom controls ABOVE the image --------------------
         if st.session_state.chart_png:
-            # Controls live right above the image
             c1, c2, c3 = st.columns([1, 1, 2])
             with c1:
                 width_px = st.slider("🔍 Zoom width (px)", 300, 2000, 900, step=50, key="zoom_width")
@@ -134,20 +127,17 @@ if uploaded_file is not None:
                 else:
                     height_px = None  # ignored
 
-            # Render persisted PNG with chosen zoom
             if keep_aspect:
                 st.image(st.session_state.chart_png, width=width_px)
             else:
-                # Resize to (width_px, height_px) using Pillow
                 try:
                     img = Image.open(io.BytesIO(st.session_state.chart_png))
                     img = img.resize((int(width_px), int(height_px)), Image.BICUBIC)
                     out = io.BytesIO()
                     img.save(out, format="PNG")
                     out.seek(0)
-                    st.image(out, width=None)  # already resized to exact pixels
+                    st.image(out, width=None)
                 except Exception:
-                    # Fallback if Pillow not available or fails
                     st.image(st.session_state.chart_png, width=width_px)
 
     except Exception as e:

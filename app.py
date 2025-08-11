@@ -7,12 +7,16 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")  # important on Streamlit Cloud (no GUI)
 import matplotlib.pyplot as plt
-import pandasai as pai  # updated for latest API
+
+# Try both PandasAI APIs (v3+ and v2.x)
+import pandasai as pai
+
 # from ollama_llm import OllamaLLM   # ← keep if you want to switch back locally
 from groq_llm import GroqLLM        # ← use Groq
 
 # Optional: for non-proportional resizing when "Keep aspect ratio" is OFF
 from PIL import Image
+
 
 # -------------------- Page & LLM --------------------
 st.set_page_config(page_title="AI CSV Analyst", layout="wide")
@@ -25,11 +29,13 @@ except RuntimeError as e:
     st.error(str(e))
     st.stop()
 
+
 # -------------------- Session state --------------------
 if "chart_png" not in st.session_state:
     st.session_state.chart_png = None
 if "answer_text" not in st.session_state:
     st.session_state.answer_text = None
+
 
 # -------------------- File upload --------------------
 uploaded_file = st.file_uploader("📂 Upload a CSV file", type=["csv"])
@@ -50,27 +56,53 @@ if uploaded_file is not None:
             if prompt.strip():
                 with st.spinner("🧠 Thinking..."):
                     try:
-                        # New PandasAI usage
-                        pai.config.set({
-                            "llm": llm,
-                            "enable_code_execution": True,  # allow plotting code
-                        })
-                        smart_df = pai.DataFrame(df)
+                        # -------------------- PandasAI compatibility shim --------------------
+                        # v3+ API exposes pai.config and pai.DataFrame
+                        # v2.x API uses SmartDataframe(df, config={...})
+                        plt.close('all')  # clean matplotlib state
 
-                        # A) Clean matplotlib state each run
-                        plt.close('all')
+                        if hasattr(pai, "config") and hasattr(pai, "DataFrame"):
+                            # ---- v3+ path ----
+                            # Some builds use pai.config.set; others accept dict assignment
+                            try:
+                                pai.config.set({
+                                    "llm": llm,
+                                    "enable_code_execution": True,  # allow plotting code
+                                })
+                            except Exception:
+                                try:
+                                    pai.config = {
+                                        "llm": llm,
+                                        "enable_code_execution": True,
+                                    }
+                                except Exception:
+                                    pass
 
-                        # Ask the model
-                        response = smart_df.chat(prompt)
+                            smart_df = pai.DataFrame(df)
+                            response = smart_df.chat(prompt)
 
-                        # B) Gentle retry if PandasAI returned its failure string
+                        else:
+                            # ---- v2.x path (legacy SmartDataframe) ----
+                            from pandasai import SmartDataframe
+                            smart_df = SmartDataframe(
+                                df,
+                                config={
+                                    "llm": llm,
+                                    "enable_code_execution": True,  # allow plotting code
+                                },
+                            )
+                            response = smart_df.chat(prompt)
+                        # ---------------------------------------------------------------------
+
+                        # Gentle retry if PandasAI returned a common failure string
                         if isinstance(response, str) and "All objects passed were None" in response:
                             retry_prompt = (
                                 prompt
                                 + "\n\nIf a chart or dataframe is not straightforward, "
                                   "answer concisely in plain text. Do NOT return None."
                             )
-                            plt.close('all')  # also start retry clean
+                            plt.close('all')
+                            # Reuse the same smart_df for retry
                             response = smart_df.chat(retry_prompt)
 
                         # Minimal guard for a None reply
@@ -91,11 +123,11 @@ if uploaded_file is not None:
                         fig = None
                         fig_nums = plt.get_fignums()
                         if fig_nums:
-                            fig = plt.figure(fig_nums[-1])  # last created fig
+                            fig = plt.figure(fig_nums[-1])  # last created figure
 
                         if fig and fig.get_axes():
                             buf = io.BytesIO()
-                            fig.set_dpi(150)
+                            fig.set_dpi(150)  # nice crisp export
                             fig.savefig(buf, format="png", bbox_inches="tight", facecolor="white")
                             buf.seek(0)
                             st.session_state.chart_png = buf.read()
@@ -104,6 +136,11 @@ if uploaded_file is not None:
                             st.session_state.chart_png = None
                             st.info("ℹ️ No chart was generated for this prompt.")
 
+                    except ImportError:
+                        st.error(
+                            "Your installed pandasai version is too old. "
+                            "Please upgrade to a recent release (e.g., pandasai>=2.3)."
+                        )
                     except Exception as e:
                         st.error(f"❌ Error during chat or chart rendering: {e}")
             else:
@@ -127,17 +164,20 @@ if uploaded_file is not None:
                 else:
                     height_px = None  # ignored
 
+            # Render persisted PNG with chosen zoom
             if keep_aspect:
                 st.image(st.session_state.chart_png, width=width_px)
             else:
+                # Resize to (width_px, height_px) using Pillow
                 try:
                     img = Image.open(io.BytesIO(st.session_state.chart_png))
                     img = img.resize((int(width_px), int(height_px)), Image.BICUBIC)
                     out = io.BytesIO()
                     img.save(out, format="PNG")
                     out.seek(0)
-                    st.image(out, width=None)
+                    st.image(out, width=None)  # already resized to exact pixels
                 except Exception:
+                    # Fallback if Pillow fails
                     st.image(st.session_state.chart_png, width=width_px)
 
     except Exception as e:
